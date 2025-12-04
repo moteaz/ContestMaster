@@ -1,9 +1,25 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  ValidationPipe,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { ContestsService } from './contests.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { CreateContestDto, UpdateContestDto } from './dto';
 
 @Controller('contests')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -11,14 +27,25 @@ export class ContestsController {
   constructor(private readonly contestsService: ContestsService) {}
 
   @Post()
-  @Roles(UserRole.ORGANIZER)
-  create(@Body() createContestDto: any) {
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body(ValidationPipe) createContestDto: CreateContestDto) {
     return this.contestsService.create(createContestDto);
   }
 
   @Get()
-  findAll() {
-    return this.contestsService.findAll();
+  findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('isActive') isActive?: string,
+    @Query('organizerId') organizerId?: string,
+  ) {
+    return this.contestsService.findAll({
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      organizerId,
+      page,
+      limit,
+    });
   }
 
   @Get(':id')
@@ -26,14 +53,20 @@ export class ContestsController {
     return this.contestsService.findOne(id);
   }
 
+  @Get(':id/statistics')
+  getStatistics(@Param('id') id: string) {
+    return this.contestsService.getContestStatistics(id);
+  }
+
   @Put(':id')
-  @Roles(UserRole.ORGANIZER)
-  update(@Param('id') id: string, @Body() updateContestDto: any) {
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  update(@Param('id') id: string, @Body(ValidationPipe) updateContestDto: UpdateContestDto) {
     return this.contestsService.update(id, updateContestDto);
   }
 
   @Delete(':id')
-  @Roles(UserRole.ORGANIZER)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
     return this.contestsService.remove(id);
   }
