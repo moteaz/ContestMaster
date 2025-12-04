@@ -1,0 +1,332 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum ContestStepType {
+  DRAFT
+  REGISTRATION
+  PRE_SELECTION
+  JURY_EVALUATION
+  RESULT
+}
+
+enum RuleType {
+  AGE_LIMIT
+  SUBMISSION_COUNT
+  CANDIDATE_LIMIT
+  FILE_VALIDATION
+  TERMS_VALIDATION
+  CUSTOM
+}
+
+enum RuleExecution {
+  AUTOMATIC
+  MANUAL
+}
+
+enum SubmissionType {
+  DOCUMENT
+  VIDEO
+  LINK
+}
+
+enum UserRole {
+  ORGANIZER
+  CANDIDATE
+  JURY_MEMBER
+  ADMIN
+}
+
+enum CandidateStatus {
+  REGISTERED
+  QUALIFIED
+  ELIMINATED
+  PENDING
+}
+
+// Core Entities
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  role      UserRole
+  age       Int?
+  institution String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizedContests Contest[]     @relation("OrganizerContests")
+  candidatures     Candidate[]
+  juryMemberships  JuryMember[]
+
+  @@map("users")
+}
+
+model Contest {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  maxCandidates Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organizerId String
+  organizer   User @relation("OrganizerContests", fields: [organizerId], references: [id], onDelete: Cascade)
+  
+  steps         ContestStep[]
+  candidates    Candidate[]
+  juryMembers   JuryMember[]
+  scoreSheets   ScoreSheet[]
+  dynamicRules  DynamicRule[]
+  stepHistory   StepHistory[]
+
+  @@map("contests")
+}
+
+model ContestStep {
+  id          String          @id @default(cuid())
+  type        ContestStepType
+  name        String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  minCandidates Int?
+  isActive    Boolean         @default(false)
+  isCompleted Boolean         @default(false)
+  order       Int
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  // Relations
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  stepHistory StepHistory[]
+
+  @@unique([contestId, type])
+  @@unique([contestId, order])
+  @@map("contest_steps")
+}
+
+model StepHistory {
+  id          String   @id @default(cuid())
+  fromStep    ContestStepType?
+  toStep      ContestStepType
+  triggeredBy String   // User ID or "SYSTEM"
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  stepId String?
+  step   ContestStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
+  @@map("step_history")
+}
+
+model Candidate {
+  id              String          @id @default(cuid())
+  status          CandidateStatus @default(REGISTERED)
+  registrationDate DateTime       @default(now())
+  eliminationReason String?
+  termsAccepted   Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  submissions Submission[]
+  scores      Score[]
+
+  @@unique([userId, contestId])
+  @@map("candidates")
+}
+
+model JuryMember {
+  id          String   @id @default(cuid())
+  expertise   String?
+  isActive    Boolean  @default(true)
+  maxCandidates Int?   @default(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  scores Score[]
+
+  @@unique([userId, contestId])
+  @@map("jury_members")
+}
+
+model Submission {
+  id          String         @id @default(cuid())
+  type        SubmissionType
+  title       String
+  description String?
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  mimeType    String?
+  linkUrl     String?
+  isValid     Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
+
+model ScoreSheet {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  minScore    Float    @default(0)
+  maxScore    Float    @default(20)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  criteria ScoreCriteria[]
+  scores   Score[]
+
+  @@map("score_sheets")
+}
+
+model ScoreCriteria {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  weight      Float   @default(1.0)
+  minValue    Float   @default(0)
+  maxValue    Float   @default(20)
+  order       Int
+  isRequired  Boolean @default(true)
+
+  // Relations
+  scoreSheetId String
+  scoreSheet   ScoreSheet @relation(fields: [scoreSheetId], references: [id], onDelete: Cascade)
+  
+  criteriaScores CriteriaScore[]
+
+  @@unique([scoreSheetId, order])
+  @@map("score_criteria")
+}
+
+model Score {
+  id          String   @id @default(cuid())
+  totalScore  Float?
+  finalScore  Float?
+  comment     String?
+  isAnomaly   Boolean  @default(false)
+  anomalyReason String?
+  isValidated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  juryMemberId String
+  juryMember   JuryMember @relation(fields: [juryMemberId], references: [id], onDelete: Cascade)
+  
+  scoreSheetId String
+  scoreSheet   ScoreSheet @relation(fields: [scoreSheetId], references: [id], onDelete: Cascade)
+  
+  criteriaScores CriteriaScore[]
+
+  @@unique([candidateId, juryMemberId, scoreSheetId])
+  @@map("scores")
+}
+
+model CriteriaScore {
+  id    String @id @default(cuid())
+  value Float
+  comment String?
+
+  // Relations
+  scoreId String
+  score   Score @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  
+  criteriaId String
+  criteria   ScoreCriteria @relation(fields: [criteriaId], references: [id], onDelete: Cascade)
+
+  @@unique([scoreId, criteriaId])
+  @@map("criteria_scores")
+}
+
+model DynamicRule {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        RuleType
+  execution   RuleExecution @default(AUTOMATIC)
+  isBlocking  Boolean       @default(true)
+  isActive    Boolean       @default(true)
+  order       Int
+  
+  // Rule Configuration (JSON)
+  config      Json // Stores rule-specific parameters
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  executions RuleExecution_Log[]
+
+  @@unique([contestId, order])
+  @@map("dynamic_rules")
+}
+
+model RuleExecution_Log {
+  id            String   @id @default(cuid())
+  executedAt    DateTime @default(now())
+  affectedCount Int      @default(0)
+  success       Boolean  @default(true)
+  errorMessage  String?
+  executedBy    String   // User ID or "SYSTEM"
+
+  // Relations
+  ruleId String
+  rule   DynamicRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@map("rule_execution_logs")
+}
