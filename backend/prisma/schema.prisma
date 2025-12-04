@@ -3,7 +3,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -58,6 +57,7 @@ enum CandidateStatus {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  password  String
   firstName String
   lastName  String
   role      UserRole
@@ -82,6 +82,8 @@ model Contest {
   endDate     DateTime
   maxCandidates Int?
   isActive    Boolean  @default(true)
+  currentStepType ContestStepType @default(DRAFT)
+  autoTransition Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -95,6 +97,8 @@ model Contest {
   scoreSheets   ScoreSheet[]
   dynamicRules  DynamicRule[]
   stepHistory   StepHistory[]
+  transitions   WorkflowTransition[]
+  calculations  ScoreCalculation[]
 
   @@map("contests")
 }
@@ -107,8 +111,11 @@ model ContestStep {
   startDate   DateTime?
   endDate     DateTime?
   minCandidates Int?
+  maxCandidates Int?
+  requiredSubmissions Int? @default(0)
   isActive    Boolean         @default(false)
   isCompleted Boolean         @default(false)
+  canRollback Boolean         @default(false)
   order       Int
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -160,6 +167,8 @@ model Candidate {
   
   submissions Submission[]
   scores      Score[]
+  assignments JuryAssignment[]
+  calculations ScoreCalculation[]
 
   @@unique([userId, contestId])
   @@map("candidates")
@@ -170,6 +179,8 @@ model JuryMember {
   expertise   String?
   isActive    Boolean  @default(true)
   maxCandidates Int?   @default(10)
+  currentLoad Int      @default(0)
+  conflictInstitutions String[] // Array of institution names to avoid
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -181,6 +192,7 @@ model JuryMember {
   contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
   
   scores Score[]
+  assignments JuryAssignment[]
 
   @@unique([userId, contestId])
   @@map("jury_members")
@@ -251,10 +263,14 @@ model Score {
   id          String   @id @default(cuid())
   totalScore  Float?
   finalScore  Float?
+  weightedScore Float?
+  medianScore Float?
   comment     String?
   isAnomaly   Boolean  @default(false)
   anomalyReason String?
+  anomalyThreshold Float? // Deviation percentage that triggered anomaly
   isValidated Boolean  @default(false)
+  needsReview Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -329,4 +345,54 @@ model RuleExecution_Log {
   rule   DynamicRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
   @@map("rule_execution_logs")
+}
+
+// New entities for missing functionality
+model JuryAssignment {
+  id          String   @id @default(cuid())
+  assignedAt  DateTime @default(now())
+  isActive    Boolean  @default(true)
+  workloadScore Float  @default(0) // For load balancing
+  
+  // Relations
+  juryMemberId String
+  juryMember   JuryMember @relation(fields: [juryMemberId], references: [id], onDelete: Cascade)
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  @@unique([juryMemberId, candidateId])
+  @@map("jury_assignments")
+}
+
+model WorkflowTransition {
+  id          String          @id @default(cuid())
+  fromStep    ContestStepType?
+  toStep      ContestStepType
+  condition   Json            // Transition conditions
+  isAutomatic Boolean         @default(true)
+  priority    Int             @default(0)
+  
+  // Relations
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  @@map("workflow_transitions")
+}
+
+model ScoreCalculation {
+  id              String   @id @default(cuid())
+  calculationType String   // "weighted", "median", "average"
+  formula         Json     // Calculation parameters
+  result          Float
+  calculatedAt    DateTime @default(now())
+  
+  // Relations
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  
+  @@map("score_calculations")
 }

@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole, ContestStepType, RuleType, RuleExecution } from '../generated/prisma';
+import { PrismaClient, UserRole, ContestStepType, RuleType, RuleExecution } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -9,6 +9,7 @@ async function main() {
   const organizer = await prisma.user.create({
     data: {
       email: 'organizer@contestmaster.com',
+      password: '$2b$10$K7L/VxwjlkXkqhP5Vq5rO.123456789', // password123
       firstName: 'John',
       lastName: 'Organizer',
       role: UserRole.ORGANIZER,
@@ -20,6 +21,7 @@ async function main() {
   const jury1 = await prisma.user.create({
     data: {
       email: 'jury1@contestmaster.com',
+      password: '$2b$10$K7L/VxwjlkXkqhP5Vq5rO.123456789', // password123
       firstName: 'Jane',
       lastName: 'Expert',
       role: UserRole.JURY_MEMBER,
@@ -31,6 +33,7 @@ async function main() {
   const candidate1 = await prisma.user.create({
     data: {
       email: 'candidate1@contestmaster.com',
+      password: '$2b$10$K7L/VxwjlkXkqhP5Vq5rO.123456789', // password123
       firstName: 'Alice',
       lastName: 'Participant',
       role: UserRole.CANDIDATE,
