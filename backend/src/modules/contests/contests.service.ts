@@ -10,7 +10,7 @@ export class ContestsService {
   async create(createContestDto: CreateContestDto): Promise<Contest> {
     this.validateDates(new Date(createContestDto.startDate), new Date(createContestDto.endDate));
 
-    return this.prisma.contest.create({
+    const contest = await this.prisma.contest.create({
       data: {
         ...createContestDto,
         startDate: new Date(createContestDto.startDate),
@@ -18,6 +18,19 @@ export class ContestsService {
       },
       include: this.getDefaultIncludes(),
     });
+
+    // Auto-create workflow steps
+    await this.prisma.contestStep.createMany({
+      data: [
+        { type: 'DRAFT' as const, name: 'Draft', order: 1, isActive: true, contestId: contest.id },
+        { type: 'REGISTRATION' as const, name: 'Registration', order: 2, contestId: contest.id },
+        { type: 'PRE_SELECTION' as const, name: 'Pre-selection', order: 3, contestId: contest.id },
+        { type: 'JURY_EVALUATION' as const, name: 'Jury Evaluation', order: 4, contestId: contest.id },
+        { type: 'RESULT' as const, name: 'Results', order: 5, contestId: contest.id },
+      ],
+    });
+
+    return contest;
   }
 
   async findAll(filters?: {

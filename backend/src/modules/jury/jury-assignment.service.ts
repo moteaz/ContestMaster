@@ -18,8 +18,12 @@ export class JuryAssignmentService {
       })
     ]);
 
-    if (juryMembers.length === 0 || candidates.length === 0) {
-      throw new Error('No jury members or candidates available');
+    if (juryMembers.length === 0) {
+      return { message: 'No jury members found for this contest', assignments: [] };
+    }
+
+    if (candidates.length === 0) {
+      return { message: 'No qualified candidates found for this contest', assignments: [] };
     }
 
     const assignments: Array<{
