@@ -14,10 +14,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Redirect to dashboard if authenticated and trying to access auth pages
-  if (token && isPublicRoute) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
+  // Don't redirect authenticated users from auth pages - let client handle it
+  // This prevents middleware from interfering with navigation
 
   return NextResponse.next();
 }

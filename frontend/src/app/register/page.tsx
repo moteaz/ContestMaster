@@ -8,9 +8,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { api, handleApiError } from '@/lib/api';
 import { setAuth } from '@/lib/auth';
+import { useToast } from '@/hooks/useToast';
 import type { AuthResponse, RegisterDto } from '@/types';
 import Button from '@/components/shared/Button';
-import Alert from '@/components/shared/Alert';
+import Toast from '@/components/shared/Toast';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,7 +25,7 @@ const registerSchema = z.object({
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const { toast, showToast, hideToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterDto>({
@@ -33,7 +34,6 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterDto) => {
     setIsLoading(true);
-    setError('');
 
     try {
       const response = await api.post<AuthResponse>('/auth/register', {
@@ -42,17 +42,18 @@ export default function RegisterPage() {
       });
       setAuth(response.data.access_token, response.data.user);
       
-      const roleRoutes = {
+      showToast('success', 'Registration successful! Redirecting...');
+      
+      const roleRoutes: Record<string, string> = {
         ORGANIZER: '/organizer/dashboard',
         CANDIDATE: '/candidate/dashboard',
         JURY_MEMBER: '/jury/dashboard',
         ADMIN: '/admin/dashboard',
       };
       
-      router.push(roleRoutes[response.data.user.role] || '/dashboard');
+      setTimeout(() => router.push(roleRoutes[response.data.user.role] || '/dashboard'), 500);
     } catch (err) {
-      setError(handleApiError(err));
-    } finally {
+      showToast('error', handleApiError(err));
       setIsLoading(false);
     }
   };
@@ -65,7 +66,13 @@ export default function RegisterPage() {
           <p className="text-gray-600 mt-2">Create your account</p>
         </div>
 
-        {error && <Alert type="error" message={error} className="mb-4" />}
+        {toast.show && (
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onClose={hideToast}
+          />
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

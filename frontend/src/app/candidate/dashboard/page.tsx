@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Trophy, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { api, handleApiError } from '@/lib/api';
+import { handleApiError } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import type { Contest, PaginatedResponse } from '@/types';
+import { contestsService } from '@/services/api';
+import type { Contest } from '@/types';
 import Button from '@/components/shared/Button';
 import Badge from '@/components/shared/Badge';
 import Alert from '@/components/shared/Alert';
@@ -23,9 +24,7 @@ export default function CandidateDashboard() {
 
   const fetchContests = async () => {
     try {
-      const response = await api.get<PaginatedResponse<Contest>>('/contests', {
-        params: { page: 1, limit: 20, isActive: true }
-      });
+      const response = await contestsService.getAll({ page: 1, limit: 20, isActive: true });
       setContests(response.data.data);
     } catch (err) {
       setError(handleApiError(err));
@@ -42,9 +41,9 @@ export default function CandidateDashboard() {
     );
   }
 
-  const activeContests = contests.filter(c => c.isActive && c.currentStep === 'REGISTRATION');
-  const ongoingContests = contests.filter(c => c.isActive && c.currentStep !== 'REGISTRATION' && c.currentStep !== 'RESULT');
-  const completedContests = contests.filter(c => c.currentStep === 'RESULT');
+  const activeContests = contests.filter(c => c.isActive && c.currentStepType === 'REGISTRATION');
+  const ongoingContests = contests.filter(c => c.isActive && c.currentStepType !== 'REGISTRATION' && c.currentStepType !== 'RESULT');
+  const completedContests = contests.filter(c => c.currentStepType === 'RESULT');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -158,7 +157,7 @@ export default function CandidateDashboard() {
                     <Badge variant="info">In Progress</Badge>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant="warning">{contest.currentStep.replace('_', ' ')}</Badge>
+                    <Badge variant="warning">{contest.currentStepType.replace('_', ' ')}</Badge>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{formatDate(contest.endDate)}</td>
                   <td className="px-6 py-4">

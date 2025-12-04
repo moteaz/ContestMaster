@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Play, Trash2, Users, Award, BarChart3 } from 'lucide-react';
-import { api, handleApiError } from '@/lib/api';
+import { handleApiError } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import type { Contest, ContestStatistics, TransitionDto, WorkflowStep } from '@/types';
+import { contestsService, workflowService, rulesService, juryService, scoringService } from '@/services/api';
+import type { ContestWithDetails, ContestStatistics, WorkflowStep } from '@/types';
 import Button from '@/components/shared/Button';
 import Badge from '@/components/shared/Badge';
 import Alert from '@/components/shared/Alert';
@@ -18,7 +19,7 @@ export default function ContestDetailPage() {
   const user = getCurrentUser();
   const contestId = params.id as string;
 
-  const [contest, setContest] = useState<Contest | null>(null);
+  const [contest, setContest] = useState<ContestWithDetails | null>(null);
   const [statistics, setStatistics] = useState<ContestStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,7 +34,7 @@ export default function ContestDetailPage() {
 
   const fetchContest = async () => {
     try {
-      const response = await api.get<Contest>(`/contests/${contestId}`);
+      const response = await contestsService.getById(contestId);
       setContest(response.data);
     } catch (err) {
       setError(handleApiError(err));
@@ -44,7 +45,7 @@ export default function ContestDetailPage() {
 
   const fetchStatistics = async () => {
     try {
-      const response = await api.get<ContestStatistics>(`/contests/${contestId}/statistics`);
+      const response = await contestsService.getStatistics(contestId);
       setStatistics(response.data);
     } catch (err) {
       console.error('Failed to fetch statistics:', err);
@@ -58,8 +59,7 @@ export default function ContestDetailPage() {
     setSuccess('');
 
     try {
-      const data: TransitionDto = { toStep, triggeredBy: user.id };
-      await api.post(`/workflow/${contestId}/transition`, data);
+      await workflowService.transition(contestId, toStep, user.id);
       setSuccess(`Successfully transitioned to ${toStep}`);
       fetchContest();
       fetchStatistics();
@@ -77,7 +77,7 @@ export default function ContestDetailPage() {
     setSuccess('');
 
     try {
-      await api.post(`/rules/${contestId}/execute`, { executedBy: user.id });
+      await rulesService.execute(contestId, user.id);
       setSuccess('Rules executed successfully');
       fetchStatistics();
     } catch (err) {
@@ -93,8 +93,12 @@ export default function ContestDetailPage() {
     setSuccess('');
 
     try {
-      await api.post(`/jury/${contestId}/assign`);
-      setSuccess('Jury assigned successfully');
+      const response = await juryService.assign(contestId);
+      if (response.data.message) {
+        setError(response.data.message);
+      } else {
+        setSuccess('Jury assigned successfully');
+      }
       fetchStatistics();
     } catch (err) {
       setError(handleApiError(err));
@@ -109,7 +113,7 @@ export default function ContestDetailPage() {
     setSuccess('');
 
     try {
-      await api.post(`/scoring/${contestId}/calculate`);
+      await scoringService.calculate(contestId);
       setSuccess('Scores calculated successfully');
       fetchStatistics();
     } catch (err) {
@@ -122,7 +126,7 @@ export default function ContestDetailPage() {
   const handleDelete = async () => {
     setActionLoading(true);
     try {
-      await api.delete(`/contests/${contestId}`);
+      await contestsService.delete(contestId);
       router.push('/organizer/dashboard');
     } catch (err) {
       setError(handleApiError(err));
@@ -147,7 +151,7 @@ export default function ContestDetailPage() {
   }
 
   const workflowSteps: WorkflowStep[] = ['DRAFT', 'REGISTRATION', 'PRE_SELECTION', 'JURY_EVALUATION', 'RESULT'];
-  const currentStepIndex = workflowSteps.indexOf(contest.currentStep);
+  const currentStepIndex = workflowSteps.indexOf(contest.currentStepType);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -171,7 +175,7 @@ export default function ContestDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-sm text-gray-600">Current Step</p>
-          <Badge variant="info" className="mt-2">{contest.currentStep.replace('_', ' ')}</Badge>
+          <Badge variant="info" className="mt-2">{contest.currentStepType.replace('_', ' ')}</Badge>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-sm text-gray-600">Duration</p>

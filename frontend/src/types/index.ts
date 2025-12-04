@@ -45,7 +45,7 @@ export interface Contest {
   maxCandidates: number;
   autoTransition: boolean;
   isActive: boolean;
-  currentStep: WorkflowStep;
+  currentStepType: WorkflowStep;
   organizerId: string;
   organizer?: User;
   createdAt: string;
@@ -88,6 +88,12 @@ export interface ContestStatistics {
     activeJuryMembers: number;
     totalSubmissions: number;
   };
+}
+
+export interface ContestWithDetails extends Contest {
+  steps?: any[];
+  candidates?: any[];
+  juryMembers?: any[];
 }
 
 // Pagination

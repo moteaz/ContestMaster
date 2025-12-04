@@ -1,22 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, handleApiError } from '@/lib/api';
 import { setAuth } from '@/lib/auth';
-import type { AuthResponse, LoginDto } from '@/types';
+import { useToast } from '@/hooks/useToast';
+import type { AuthResponse } from '@/types';
 import Button from '@/components/shared/Button';
-import Alert from '@/components/shared/Alert';
+import Toast from '@/components/shared/Toast';
 
 export default function LoginPage() {
-  const [error, setError] = useState('');
+  const router = useRouter();
+  const { toast, showToast, hideToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Check if already logged in
+    const token = localStorage.getItem('access_token');
+    const userStr = localStorage.getItem('user');
+    if (token && userStr) {
+      const user = JSON.parse(userStr);
+      const roleRoutes: Record<string, string> = {
+        ORGANIZER: '/organizer/dashboard',
+        CANDIDATE: '/candidate/dashboard',
+        JURY_MEMBER: '/jury/dashboard',
+        ADMIN: '/admin/dashboard',
+      };
+      router.replace(roleRoutes[user.role] || '/dashboard');
+    }
+  }, [router]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted');
     setIsLoading(true);
-    setError('');
 
     const formData = new FormData(e.target as HTMLFormElement);
     const data = {
@@ -25,12 +42,12 @@ export default function LoginPage() {
     };
 
     try {
-      console.log('Calling API...');
       const response = await api.post<AuthResponse>('/auth/login', data);
-      console.log('Login response:', response.data);
       setAuth(response.data.access_token, response.data.user);
       
-      const roleRoutes = {
+      showToast('success', 'Login successful! Redirecting...');
+      
+      const roleRoutes: Record<string, string> = {
         ORGANIZER: '/organizer/dashboard',
         CANDIDATE: '/candidate/dashboard',
         JURY_MEMBER: '/jury/dashboard',
@@ -38,11 +55,9 @@ export default function LoginPage() {
       };
       
       const redirectUrl = roleRoutes[response.data.user.role] || '/dashboard';
-      console.log('Redirecting to:', redirectUrl);
-      window.location.href = redirectUrl;
+      setTimeout(() => router.push(redirectUrl), 500);
     } catch (err) {
-      console.error('Login error:', err);
-      setError(handleApiError(err));
+      showToast('error', handleApiError(err));
       setIsLoading(false);
     }
   };
@@ -55,7 +70,13 @@ export default function LoginPage() {
           <p className="text-gray-600 mt-2">Sign in to your account</p>
         </div>
 
-        {error && <Alert type="error" message={error} className="mb-4" />}
+        {toast.show && (
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onClose={hideToast}
+          />
+        )}
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>

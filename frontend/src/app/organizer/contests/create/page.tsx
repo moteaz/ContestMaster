@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { api, handleApiError } from '@/lib/api';
+import { handleApiError } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import type { CreateContestDto, Contest } from '@/types';
+import { contestsService } from '@/services/api';
+import type { CreateContestDto } from '@/types';
 import Button from '@/components/shared/Button';
 import Alert from '@/components/shared/Alert';
 
@@ -48,7 +49,7 @@ export default function CreateContestPage() {
         organizerId: user.id,
       };
 
-      await api.post<Contest>('/contests', contestData);
+      await contestsService.create(contestData);
       router.push('/organizer/dashboard');
     } catch (err) {
       setError(handleApiError(err));

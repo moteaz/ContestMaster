@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, TrendingUp, Users, Award, AlertCircle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { handleApiError } from '@/lib/api';
-import { getCurrentUser } from '@/lib/auth';
 import { contestsService } from '@/services/api';
 import type { Contest } from '@/types';
 import Button from '@/components/shared/Button';
@@ -12,11 +11,10 @@ import Badge from '@/components/shared/Badge';
 import Alert from '@/components/shared/Alert';
 import { formatDate } from '@/lib/utils';
 
-export default function OrganizerDashboard() {
+export default function ContestsListPage() {
   const [contests, setContests] = useState<Contest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const user = getCurrentUser();
 
   useEffect(() => {
     fetchContests();
@@ -24,24 +22,13 @@ export default function OrganizerDashboard() {
 
   const fetchContests = async () => {
     try {
-      const response = await contestsService.getAll({ page: 1, limit: 10 });
+      const response = await contestsService.getAll({ page: 1, limit: 50 });
       setContests(response.data.data);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStepBadge = (step: string) => {
-    const variants: Record<string, 'default' | 'info' | 'warning' | 'success'> = {
-      DRAFT: 'default',
-      REGISTRATION: 'info',
-      PRE_SELECTION: 'warning',
-      JURY_EVALUATION: 'warning',
-      RESULT: 'success',
-    };
-    return <Badge variant={variants[step] || 'default'}>{step.replace('_', ' ')}</Badge>;
   };
 
   if (loading) {
@@ -55,10 +42,7 @@ export default function OrganizerDashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Welcome back, {user?.firstName}!</p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900">All Contests</h1>
         <Link href="/organizer/contests/create">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
@@ -69,60 +53,7 @@ export default function OrganizerDashboard() {
 
       {error && <Alert type="error" message={error} className="mb-6" />}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Contests</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{contests.length}</p>
-            </div>
-            <TrendingUp className="h-8 w-8 text-primary-600" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Active Contests</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {contests.filter(c => c.isActive).length}
-              </p>
-            </div>
-            <Award className="h-8 w-8 text-green-600" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Candidates</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {contests.reduce((sum, c) => sum + (c._count?.candidates || 0), 0)}
-              </p>
-            </div>
-            <Users className="h-8 w-8 text-blue-600" />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Jury Members</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {contests.reduce((sum, c) => sum + (c._count?.juryMembers || 0), 0)}
-              </p>
-            </div>
-            <AlertCircle className="h-8 w-8 text-yellow-600" />
-          </div>
-        </div>
-      </div>
-
-      {/* Contests Table */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Contests</h2>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -146,7 +77,9 @@ export default function OrganizerDashboard() {
                       {contest.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4">{getStepBadge(contest.currentStepType)}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant="info">{contest.currentStepType.replace('_', ' ')}</Badge>
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     {contest._count?.candidates || 0} / {contest.maxCandidates}
                   </td>

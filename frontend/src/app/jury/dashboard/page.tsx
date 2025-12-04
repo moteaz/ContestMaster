@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, Users, CheckCircle, Clock } from 'lucide-react';
-import { api, handleApiError } from '@/lib/api';
+import { handleApiError } from '@/lib/api';
 import { getCurrentUser } from '@/lib/auth';
-import type { Contest, PaginatedResponse, JuryAssignment } from '@/types';
+import { contestsService } from '@/services/api';
+import type { Contest, JuryAssignment } from '@/types';
 import Button from '@/components/shared/Button';
 import Badge from '@/components/shared/Badge';
 import Alert from '@/components/shared/Alert';
@@ -23,11 +24,9 @@ export default function JuryDashboard() {
 
   const fetchData = async () => {
     try {
-      const contestsResponse = await api.get<PaginatedResponse<Contest>>('/contests', {
-        params: { page: 1, limit: 20 }
-      });
+      const contestsResponse = await contestsService.getAll({ page: 1, limit: 20 });
       setContests(contestsResponse.data.data.filter(c => 
-        c.currentStep === 'JURY_EVALUATION' || c.currentStep === 'RESULT'
+        c.currentStepType === 'JURY_EVALUATION' || c.currentStepType === 'RESULT'
       ));
     } catch (err) {
       setError(handleApiError(err));
@@ -44,8 +43,8 @@ export default function JuryDashboard() {
     );
   }
 
-  const activeEvaluations = contests.filter(c => c.currentStep === 'JURY_EVALUATION');
-  const completedEvaluations = contests.filter(c => c.currentStep === 'RESULT');
+  const activeEvaluations = contests.filter(c => c.currentStepType === 'JURY_EVALUATION');
+  const completedEvaluations = contests.filter(c => c.currentStepType === 'RESULT');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
